@@ -1,5 +1,11 @@
-from fastapi import FastAPI 
+from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+import models
+from database import engine, get_db
+
+models.Base.metadata.create_all(bind=engine)
 
 app= FastAPI()
 
@@ -7,29 +13,65 @@ class Developer(BaseModel):
     username:str
     email:str
     github_handle:str
+
     
+# POST Request -> (CREATE Endpoint)
+@app.post('/developer', status_code=201)
+def create_developer(dev: Developer, db: Session = Depends(get_db)):
+    new_developer = models.Developer(
+        username=dev.username,
+        email=dev.email,
+        github_handle=dev.github_handle
+    )
+    db.add(new_developer)
+    try:
+        db.commit()
+        db.refresh(new_developer)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"A developer with email '{dev.email}' already exists."
+        )
+    return {"message": "Developer created successfully", "data": new_developer}
 
-@app.get('/')
-def home():
-    return {"message": "DevPulse API"}
 
-@app.get('/health')
-def health_check():
-    return {'status':"ok"}
+# Get all developers -> (GET Endpoint)
+@app.get("/developers")
+def get_all_developers(db:Session = Depends(get_db)):
+    all_devs = db.query(models.Developer).all()
+    return {"message":"Developers fetched successfully", "data":all_devs}
 
-@app.get("/developer")
-def list_developer(limit: int = 10, active: bool = True):
-    return {"limit": limit, "active": active}
 
-@app.get("/commits")
-def get_commits(username:str, limit:int=10, page:int=1):
-    skip = (page-1)*limit
-    return {"username":username, "limit":limit, "page":page, "skip":skip}    
+# Get specific developer (by username) -> (GET ENDPOINT)
+@app.get("/developer/{username}")
+def get_single_developer(username:str, db:Session= Depends(get_db)):
+    single_dev = db.query(models.Developer).filter(models.Developer.username.lower()== username.lower()).first()
+    return {"message":"Developer fetched successfully", "data":single_dev}
 
-@app.get('/developer/{username}')
-def get_developer(username:str):
-    return {'username':username} 
+# Update developer -> (PUT Endpoint)
+@app.put('/developer/{dev_id}')
+def update_developer(dev_id:int, dev_data:Developer, db:Session= Depends(get_db)):
+    dev= db.query(models.Developer).filter(models.Developer.id== dev_id).first()
+    if dev is None:
+        return {"message":"Developer not found"}
+    
+    dev.username = dev_data.username
+    dev.email = dev_data.email
+    dev.github_handle = dev_data.github_handle
 
-@app.post('/developer')
-def create_developer(dev: Developer):
-    return {"message": f"developer {dev.username} registered successfully", "data": dev}
+    db.commit()
+    db.refresh(dev)
+    return {"message":"Developer updated successfully", "data":dev}
+
+# Delete developer -> (DELETE Endpoint)
+@app.delete('/developer/{dev_id}')
+def delete_developer(dev_id:int,db:Session= Depends(get_db)):
+    dev= db.query(models.Developer).filter(models.Developer.id== dev_id).first()
+    if dev is None:
+        return {"message":"Developer not found"}
+    
+    db.delete(dev)
+    db.commit()
+    return {"message":"Developer deleted successfully"}
+
