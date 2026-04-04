@@ -4,6 +4,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 import models
 from database import engine, get_db
+import utils
+
+
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -13,15 +16,33 @@ class Developer(BaseModel):
     username:str
     email:str
     github_handle:str
+    password:str
 
     
 # POST Request -> (CREATE Endpoint)
 @app.post('/developer', status_code=201)
 def create_developer(dev: Developer, db: Session = Depends(get_db)):
+    existing = db.query(models.Developer).filter(
+        (models.Developer.email == dev.email) |
+        (models.Developer.username == dev.username)
+    ).first()
+    if existing:
+        if existing.email == dev.email:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Email '{dev.email}' is already registered."
+            )
+        raise HTTPException(
+            status_code=409,
+            detail=f"Username '{dev.username}' is already taken."
+        )
+
+    hashed_password = utils.hash_password(dev.password)
     new_developer = models.Developer(
         username=dev.username,
         email=dev.email,
-        github_handle=dev.github_handle
+        github_handle=dev.github_handle,
+        hashed_password = hashed_password
     )
     db.add(new_developer)
     try:
@@ -31,7 +52,7 @@ def create_developer(dev: Developer, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail=f"A developer with email '{dev.email}' already exists."
+            detail="Duplicate entry — email or username already exists."
         )
     return {"message": "Developer created successfully", "data": new_developer}
 
