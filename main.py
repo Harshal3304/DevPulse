@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -96,3 +97,15 @@ def delete_developer(dev_id:int,db:Session= Depends(get_db)):
     db.commit()
     return {"message":"Developer deleted successfully"}
 
+# Login EndPoint ->
+@app.post('/login')
+def login(user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    
+    dev = db.query(models.Developer).filter(models.Developer.username == user_credentials.username).first()
+    
+    if not dev:
+        raise HTTPException(status_code=403, detail="Invalid Credentials (User nahi mila)")
+    if not utils.verify_password(user_credentials.password, dev.hashed_password):
+        raise HTTPException(status_code=403, detail="Invalid Credentials (Password galat hai)")
+    access_token = utils.create_access_token(data={"sub": dev.username})
+    return {"access_token": access_token, "token_type": "bearer"}
