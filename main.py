@@ -109,3 +109,8 @@ def login(user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session =
         raise HTTPException(status_code=403, detail="Invalid Credentials (Password galat hai)")
     access_token = utils.create_access_token(data={"sub": dev.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+# Protected Endpoint 
+@app.get("/me")
+def get_my_profile(current_user:models.Developer= Depends(utils.get_current_user)):
+    return {"message":"Profile fetched successfully", "data":current_user}
