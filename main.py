@@ -6,12 +6,33 @@ from sqlalchemy.exc import IntegrityError
 import models
 from database import engine, get_db
 import utils
-
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 
 models.Base.metadata.create_all(bind=engine)
 
 app= FastAPI()
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "Error": "Wrong Data Format!", 
+            "Details": exc.errors()
+        }
+    )
+
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"DANGER: Server Error -> {exc}") 
+    return JSONResponse(
+        status_code=500,
+        content={
+            "Error": "Internal Server Error"
+        }
+    )
 
 class Developer(BaseModel):
     username:str
