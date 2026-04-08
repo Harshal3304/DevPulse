@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from jose import jwt
+from jose import jwt, JWTError 
 from dotenv import load_dotenv
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException
@@ -16,7 +16,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 pwd_context = CryptContext(schemes =["bcrypt"], deprecated = "auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login") 
 
 def hash_password(password: str):
     truncated = password.encode("utf-8")[:72]
@@ -34,8 +34,8 @@ def create_access_token(data:dict):
 
 def get_current_user(token:str= Depends(oauth2_scheme), db : Session= Depends(get_db)):
     credential_exception= HTTPException(
-        status_code=404,
-        detail= "Could not validate cerdential",
+        status_code=401, 
+        detail= "Could not validate credential",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
