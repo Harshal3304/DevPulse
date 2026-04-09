@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 import models, schemas, utils
 from database import get_db
+import services
 
 router = APIRouter(
     prefix="/developer",
@@ -44,9 +46,16 @@ def get_all_developers(db:Session = Depends(get_db)):
     return {"message":"Developers fetched successfully", "data":all_devs}
 
 @router.get("/{username}")
-def get_single_developer(username:str, db:Session= Depends(get_db)):
-    single_dev = db.query(models.Developer).filter(models.Developer.username.lower()== username.lower()).first()
-    return {"message":"Developer fetched successfully", "data":single_dev}
+async def get_single_developer(username: str, db: Session = Depends(get_db)):
+    single_dev = db.query(models.Developer).filter(
+        func.lower(models.Developer.username) == username.lower()
+    ).first()
+
+    if single_dev is None:
+        raise HTTPException(status_code=404, detail=f"Developer '{username}' not found")
+
+    github_data = await services.fetch_github_profile(single_dev.github_handle)
+    return {"message": "Developer fetched successfully", "data": single_dev, "github_data": github_data}
 
 @router.put('/{dev_id}')
 def update_developer(dev_id:int, dev_data: schemas.DeveloperUpdate, db:Session= Depends(get_db)):

@@ -23,7 +23,8 @@ def hash_password(password: str):
     return pwd_context.hash(truncated)
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    truncated = plain_password.encode("utf-8")[:72]
+    return pwd_context.verify(truncated, hashed_password)
 
 def create_access_token(data:dict):
     to_encode = data.copy()
