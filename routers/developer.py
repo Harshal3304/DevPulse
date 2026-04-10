@@ -5,6 +5,8 @@ from sqlalchemy import func
 import models, schemas, utils
 from database import get_db
 import services
+from typing import Optional
+from sqlalchemy import or_
 
 router = APIRouter(
     prefix="/developer",
@@ -41,8 +43,13 @@ def create_developer(dev: schemas.DeveloperCreate, db: Session = Depends(get_db)
 
 
 @router.get("s")
-def get_all_developers(db:Session = Depends(get_db)):
-    all_devs = db.query(models.Developer).all()
+def get_all_developers(db:Session = Depends(get_db), limit:int =10, skip:int =0, search:Optional[str]= ""):
+    query = db.query(models.Developer)
+    if search:
+        search_term = f"%{search}%"
+        query= query.filter(models.Developer.username.ilike(search_term),models.Developer.github_handle.ilike(search_term),models.Developer.email.ilike(search_term))
+
+    all_devs = query.offset(skip).limit(limit).all()
     return {"message":"Developers fetched successfully", "data":all_devs}
 
 @router.get("/{username}")
